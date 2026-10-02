@@ -10,7 +10,7 @@
 
 > Local-first GitHub traffic tracker with external event correlation, upstream staleness detection, and MCP server access.
 
-GitHub's traffic API returns HTTP 200 with a frozen snapshot and no status page entry. `gh_repo_traffic` fixes the silent failure problem; it persists your traffic data locally, detects stale API responses before they corrupt your history, and lets you annotate traffic spikes with the external events that caused them.
+GitHub's traffic API returns HTTP 200 with a frozen snapshot and no status page entry. `GitHub-Traffic-Analytics` fixes the silent failure problem; it persists your traffic data locally, detects stale API responses before they corrupt your history, and lets you annotate traffic spikes with the external events that caused them.
 
 ---
 
@@ -33,7 +33,7 @@ GitHub's traffic API returns HTTP 200 with a frozen snapshot and no status page 
 
 GitHub's built-in traffic graphs are ephemeral; 14-day rolling window, no history, no context. When a Reddit post or a release drives a clone spike, you have no way to know why it happened or compare it to the last time.
 
-`gh_repo_traffic` gives you:
+`GitHub-Traffic-Analytics` gives you:
 
 * **Persistent local history:** daily views, clones, referrers, and paths stored in SQLite
 * **Event correlation:** annotate your traffic timeline with the external events that moved it
@@ -151,8 +151,8 @@ gh auth status
 
 ```bash
 # 1. Clone the repo
-git clone https://github.com/KikeVen/gh_repo_traffic.git
-cd gh_repo_traffic
+git clone https://github.com/KikeVen/GitHub-Traffic-Analytics.git
+cd GitHub-Traffic-Analytics
 
 # 2. Create and activate a virtual environment (Python 3.10+)
 python -m venv .venv
@@ -183,9 +183,9 @@ Add to your MCP client config (e.g., `mcp.json` in **Claude Desktop**):
 {
   "mcpServers": {
     "github-analytics": {
-      "command": "D:\\Users\\<username>\\<file_path>\\gh_repo_traffic\\venv\\Scripts\\python.exe",
+      "command": "D:\\Users\\<username>\\<file_path>\\GitHub-Traffic-Analytics\\venv\\Scripts\\python.exe",
       "args": [
-        "D:\\Users\\<username>\\<file_path>\\gh_repo_traffic\\mcp_server.py"
+        "D:\\Users\\<username>\\<file_path>\\GitHub-Traffic-Analytics\\mcp_server.py"
       ]
     }
   }
