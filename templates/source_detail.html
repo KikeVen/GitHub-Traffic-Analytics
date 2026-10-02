@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Analytics Detail: <span x-text="sourceName"></span></title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+</head>
+<body class="bg-[#0d1117] text-[#c9d1d9] min-h-screen p-6 font-sans" x-data="sourceDetail()">
+    <div class="max-w-4xl mx-auto space-y-6">
+
+        <!-- Top Header & Back Navigation -->
+        <div class="flex items-center justify-between border-b border-gray-700 pb-4">
+            <div>
+                <a href="/" class="text-xs text-blue-400 hover:underline mb-1 inline-block">&larr; Back to Dashboard</a>
+                <h1 class="text-xl font-bold text-white" x-text="sourceName"></h1>
+                <p class="text-xs text-gray-400 mt-0.5">
+                    Historical snapshot tracking for <span class="text-emerald-400 font-mono" x-text="repoName"></span> (<span x-text="sourceType"></span>)
+                </p>
+            </div>
+        </div>
+
+        <!-- Chart Section -->
+        <div class="border border-gray-700 rounded-md bg-[#161b22] p-4">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-sm font-semibold text-white">Traffic Trend Over Time</h2>
+                <span class="text-xs text-gray-400" x-text="history.length + ' Data Snapshots Recorded'"></span>
+            </div>
+            <div class="h-72 relative">
+                <canvas id="chartSourceHistory"></canvas>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        function sourceDetail() {
+            return {
+                repoId: {{ repo_id }},
+                repoName: "{{ repo_name }}",
+                sourceType: "{{ source_type }}",
+                sourceName: "{{ source_name }}",
+                history: [],
+                chartInstance: null,
+
+                async init() {
+                    await this.loadHistory();
+                },
+
+                async loadHistory() {
+                    const url = `/api/metrics/${this.repoId}/source_history?type=${this.sourceType}&name=${encodeURIComponent(this.sourceName)}`;
+                    const res = await fetch(url);
+                    this.history = await res.json();
+
+                    const labels = this.history.map(h => h.logged_date);
+                    const viewsData = this.history.map(h => h.views);
+                    const uniquesData = this.history.map(h => h.uniques);
+
+                    this.renderChart(labels, viewsData, uniquesData);
+                },
+
+                renderChart(labels, viewsData, uniquesData) {
+                    const ctx = document.getElementById('chartSourceHistory').getContext('2d');
+                    if (this.chartInstance) this.chartInstance.destroy();
+
+                    this.chartInstance = new Chart(ctx, {
+                        type: 'line',
+                        data: {
+                            labels: labels,
+                            datasets: [
+                                {
+                                    label: 'Views / Count',
+                                    data: viewsData,
+                                    borderColor: '#3fb950',
+                                    backgroundColor: 'rgba(63, 185, 80, 0.1)',
+                                    borderWidth: 2,
+                                    pointRadius: 4,
+                                    tension: 0.1,
+                                    fill: true
+                                },
+                                {
+                                    label: 'Unique Visitors',
+                                    data: uniquesData,
+                                    borderColor: '#58a6ff',
+                                    backgroundColor: 'rgba(88, 166, 255, 0.1)',
+                                    borderWidth: 2,
+                                    pointRadius: 4,
+                                    tension: 0.1,
+                                    fill: true
+                                }
+                            ]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            interaction: {
+                                mode: 'index',
+                                intersect: false
+                            },
+                            plugins: {
+                                legend: {
+                                    labels: { color: '#c9d1d9', font: { size: 11 } }
+                                }
+                            },
+                            scales: {
+                                x: { grid: { color: '#21262d' }, ticks: { color: '#8b949e', font: { size: 10 } } },
+                                y: { grid: { color: '#21262d' }, ticks: { color: '#8b949e', font: { size: 10 } }, beginAtZero: true }
+                            }
+                        }
+                    });
+                }
+            }
+        }
+    </script>
+</body>
+</html>

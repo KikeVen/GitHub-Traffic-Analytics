@@ -1,0 +1,9 @@
+# directories
+venv/
+__pycache__
+docs/
+working_backup/
+
+# files
+app.db
+.memignore

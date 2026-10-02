@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Zerikai Memory — GitHub Analytics</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg: #0d1117;
+    --surface: #161b22;
+    --border: #30363d;
+    --text: #e6edf3;
+    --muted: #8b949e;
+    --accent: #58a6ff;
+    --green: #3fb950;
+    --yellow: #d29922;
+    --red: #f85149;
+    --purple: #bc8cff;
+    --orange: #ffa657;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); padding: 24px; min-height: 100vh; }
+  h1 { font-size: 1.5rem; font-weight: 700; margin-bottom: 4px; }
+  .subtitle { color: var(--muted); font-size: 0.85rem; margin-bottom: 24px; }
+  .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 20px; }
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 20px; }
+  .grid-3 { display: grid; grid-template-columns: 2fr 1fr; gap: 16px; margin-bottom: 20px; }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 16px; }
+  .card-title { font-size: 0.75rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px; }
+  .stat { font-size: 2rem; font-weight: 700; line-height: 1; }
+  .stat-sub { font-size: 0.78rem; color: var(--muted); margin-top: 4px; }
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 20px; font-size: 0.72rem; font-weight: 600; }
+  .badge-green { background: rgba(63,185,80,.15); color: var(--green); }
+  .badge-yellow { background: rgba(210,153,34,.15); color: var(--yellow); }
+  .badge-blue { background: rgba(88,166,255,.15); color: var(--accent); }
+  .badge-purple { background: rgba(188,140,255,.15); color: var(--purple); }
+  .chart-wrap { position: relative; height: 220px; }
+  .chart-wrap-lg { position: relative; height: 260px; }
+  .section-title { font-size: 0.9rem; font-weight: 600; margin-bottom: 12px; color: var(--text); }
+  .event-list { list-style: none; }
+  .event-item { padding: 10px 0; border-bottom: 1px solid var(--border); }
+  .event-item:last-child { border-bottom: none; }
+  .event-date { font-size: 0.72rem; color: var(--muted); }
+  .event-title { font-size: 0.82rem; margin: 2px 0; }
+  .forecast-note { font-size: 0.75rem; color: var(--muted); font-style: italic; margin-top: 8px; }
+  .insight-list { list-style: none; }
+  .insight-item { display: flex; align-items: flex-start; gap: 8px; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 0.82rem; line-height: 1.4; }
+  .insight-item:last-child { border-bottom: none; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; margin-top: 5px; }
+  .dot-green { background: var(--green); }
+  .dot-yellow { background: var(--yellow); }
+  .dot-blue { background: var(--accent); }
+  .dot-red { background: var(--red); }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  @media (max-width: 700px) {
+    .grid-4 { grid-template-columns: repeat(2, 1fr); }
+    .grid-2, .grid-3 { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<h1>⚡ Zerikai Memory — GitHub Analytics</h1>
+<p class="subtitle">kikeven/zerikai_memory &nbsp;·&nbsp; Full analysis as of Oct 1, 2026 &nbsp;·&nbsp; 21 days traffic · All-time stars & commits</p>
+
+<!-- KPI row -->
+<div class="grid-4">
+  <div class="card">
+    <div class="card-title">Total Stars</div>
+    <div class="stat" style="color:var(--yellow)">34</div>
+    <div class="stat-sub">+2 last 5 days <span class="badge badge-green">▲ growing</span></div>
+  </div>
+  <div class="card">
+    <div class="card-title">Total Views (21d)</div>
+    <div class="stat" style="color:var(--accent)">363</div>
+    <div class="stat-sub">Avg 17.3/day</div>
+  </div>
+  <div class="card">
+    <div class="card-title">Total Clones (21d)</div>
+    <div class="stat" style="color:var(--green)">170</div>
+    <div class="stat-sub">Avg 8.1/day — <span class="badge badge-purple">high intent</span></div>
+  </div>
+  <div class="card">
+    <div class="card-title">Clone→View Ratio</div>
+    <div class="stat" style="color:var(--orange)">46.8%</div>
+    <div class="stat-sub">Exceptional (avg OSS ~5–15%)</div>
+  </div>
+</div>
+
+<!-- Traffic chart + Star timeline -->
+<div class="grid-2">
+  <div class="card">
+    <div class="section-title">Daily Traffic — Views & Clones (Sep 10 – Oct 1)</div>
+    <div class="chart-wrap-lg"><canvas id="trafficChart"></canvas></div>
+    <p class="forecast-note">Dashed lines = 7-day linear forecast (Oct 2–8)</p>
+  </div>
+  <div class="card">
+    <div class="section-title">Cumulative Stars Over Time</div>
+    <div class="chart-wrap-lg"><canvas id="starsChart"></canvas></div>
+    <p class="forecast-note">Dashed = forecast based on recent velocity (0.4 stars/day)</p>
+  </div>
+</div>
+
+<!-- Unique visitors + Clone ratio -->
+<div class="grid-2">
+  <div class="card">
+    <div class="section-title">Unique Visitors vs Total Views &nbsp;<span style="font-size:0.72rem;color:var(--muted);font-weight:400">● dots = external events</span></div>
+    <div class="chart-wrap-lg"><canvas id="uniquesChart"></canvas></div>
+  </div>
+  <div class="card">
+    <div class="section-title">Weekly Code Activity (Additions / Deletions)</div>
+    <div class="chart-wrap"><canvas id="commitChart"></canvas></div>
+  </div>
+</div>
+
+<!-- Events + Insights -->
+<div class="grid-3">
+  <div class="card">
+    <div class="section-title">📌 External Events (correlated with traffic spikes)</div>
+    <ul class="event-list">
+      <li class="event-item">
+        <div class="event-date">2026-05-03 &nbsp;<span class="badge badge-green">release</span></div>
+        <div class="event-title"><a href="https://github.com/KikeVen/zerikai_memory" target="_blank">Initial Public Release</a></div>
+        <div class="event-date">→ 15 stars in 48h, biggest star spike ever</div>
+      </li>
+      <li class="event-item">
+        <div class="event-date">2026-09-15 &nbsp;<span class="badge badge-blue">release</span></div>
+        <div class="event-title"><a href="https://github.com/KikeVen/zerikai_memory/releases/tag/v1.0.0-beta.18" target="_blank">v1.0.0-beta.18 — Token Cost Tracking</a></div>
+        <div class="event-date">→ 16 clones Sep 15 (peak clone day)</div>
+      </li>
+      <li class="event-item">
+        <div class="event-date">2026-09-22 &nbsp;<span class="badge badge-purple">content</span></div>
+        <div class="event-title"><a href="https://dev.to/kike/how-i-went-from-trust-me-bro-to-boomer-with-receipts-using-jev-2141" target="_blank">dev.to — RAG ranking vs judging with Jev</a></div>
+        <div class="event-date">→ 18 views Sep 22; Reddit cross-post 14 upvotes / 13 comments</div>
+      </li>
+      <li class="event-item">
+        <div class="event-date">2026-09-25 &nbsp;<span class="badge badge-green">release</span></div>
+        <div class="event-title"><a href="https://github.com/KikeVen/zerikai_memory/tree/v1.0.0" target="_blank">v1.0.0 — First Stable Release</a></div>
+        <div class="event-date">→ 77 views / 59 clones Sep 25 (all-time peak day)</div>
+      </li>
+      <li class="event-item">
+        <div class="event-date">2026-09-28 &nbsp;<span class="badge badge-yellow">community</span></div>
+        <div class="event-title">r/RAG update announcement</div>
+        <div class="event-date">→ 35 views / 8 clones Sep 28</div>
+      </li>
+      <li class="event-item">
+        <div class="event-date">2026-09-30 &nbsp;<span class="badge badge-purple">content</span></div>
+        <div class="event-title"><a href="https://news.ycombinator.com/item?id=49908655" target="_blank">Show HN: Zerikai Memory + Jev</a></div>
+        <div class="event-date">→ 44 views / 2 clones Sep 30; still unfolding</div>
+      </li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <div class="section-title">🔎 Key Insights & Forecast</div>
+    <ul class="insight-list">
+      <li class="insight-item"><span class="dot dot-green"></span><span><strong>Clone rate is extraordinary.</strong> 46.8% clone/view ratio signals very high developer intent — visitors are not browsing, they're installing.</span></li>
+      <li class="insight-item"><span class="dot dot-blue"></span><span><strong>v1.0.0 stable release was the inflection point.</strong> Sep 25 generated 77 views + 59 clones in a single day — 7× the daily average.</span></li>
+      <li class="insight-item"><span class="dot dot-yellow"></span><span><strong>Stars are dormant between spikes.</strong> 21 stars in May, then near-zero until Aug 25. Content or release announcements are the primary driver.</span></li>
+      <li class="insight-item"><span class="dot dot-blue"></span><span><strong>HN post (Sep 30) is the active catalyst.</strong> 44 views on day 1 with low clones — HN traffic is top-of-funnel. Watch clones Oct 2–4 for conversion signal.</span></li>
+      <li class="insight-item"><span class="dot dot-green"></span><span><strong>7-day forecast (Oct 2–8):</strong> Views ~20–35/day if HN fades; spike to 60–80 possible if it gains front-page traction. Clones likely 5–12/day baseline.</span></li>
+      <li class="insight-item"><span class="dot dot-red"></span><span><strong>Star forecast:</strong> At current velocity (0.4/day post Sep 26), expect 36–38 stars by Oct 8. A top-10 HN position could add 15–40 stars in 24h.</span></li>
+      <li class="insight-item"><span class="dot dot-yellow"></span><span><strong>Code activity is bursty.</strong> Large spikes (Jul 11: +2794, Sep 19: +2089) confirm feature-heavy sprints followed by quiet periods — classic solo dev pattern.</span></li>
+    </ul>
+    <div class="forecast-note" style="margin-top:12px">Forecast is based on linear trend from last 7 traffic days + historical event correlation. Not a statistical model.</div>
+  </div>
+</div>
+
+<script>
+const C = Chart;
+const font = { family: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif", size: 11 };
+
+// ── DATA ──────────────────────────────────────────────────────────────────────
+const trafficDates = [
+  'Sep 10','Sep 11','Sep 12','Sep 13','Sep 14','Sep 15','Sep 16','Sep 17',
+  'Sep 18','Sep 19','Sep 20','Sep 21','Sep 22','Sep 23','Sep 24','Sep 25',
+  'Sep 26','Sep 27','Sep 28','Sep 29','Sep 30'
+];
+const views     = [6,9,11,9,6,17,10,8,11,12,11,21,18,11,13,77,35,8,35,30,44];
+const clones    = [10,3,3,0,5,16,3,4,6,2,2,1,1,8,8,59,26,8,8,3,2];
+const uniqueVis = [4,4,3,3,4,1,4,4,3,4,3,4,5,4,4,4,6,2,7,6,30];
+
+// Forecast (7 days) — simple linear from last 7 days
+function linForecast(arr, n) {
+  const last = arr.slice(-7);
+  const sum = last.reduce((a,b)=>a+b,0);
+  const avg = sum/7;
+  // slope from first half vs second half of window
+  const h1 = last.slice(0,3).reduce((a,b)=>a+b,0)/3;
+  const h2 = last.slice(4).reduce((a,b)=>a+b,0)/3;
+  const slope = (h2-h1)/3.5;
+  return Array.from({length:n},(_,i)=> Math.max(0, Math.round(avg + slope*(i+1))));
+}
+
+const fViews  = linForecast(views, 7);
+const fClones = linForecast(clones, 7);
+const fLabels = ['Oct 2','Oct 3','Oct 4','Oct 5','Oct 6','Oct 7','Oct 8'];
+const allTrafficLabels = [...trafficDates, ...fLabels];
+
+// Pad actual data with nulls for forecast zone
+const viewsFull  = [...views,  ...Array(7).fill(null)];
+const clonesFull = [...clones, ...Array(7).fill(null)];
+const fViewsFull  = [...Array(21).fill(null), ...fViews];
+const fClonesFull = [...Array(21).fill(null), ...fClones];
+
+// Stars cumulative
+const starEvents = [
+  {date:'2026-05-03',count:1},{date:'2026-05-04',count:8},{date:'2026-05-05',count:5},
+  {date:'2026-05-06',count:3},{date:'2026-05-07',count:1},{date:'2026-05-10',count:1},
+  {date:'2026-05-18',count:4},{date:'2026-05-19',count:4},{date:'2026-05-20',count:1},
+  {date:'2026-05-25',count:1},{date:'2026-06-19',count:1},{date:'2026-06-23',count:1},
+  {date:'2026-08-25',count:1},{date:'2026-08-27',count:1},{date:'2026-09-26',count:1},
+  {date:'2026-09-30',count:1},{date:'2026-10-01',count:1}
+];
+// Build cumulative
+let cum = 0;
+const starLabels = [], starCum = [];
+starEvents.forEach(e => {
+  cum += e.count;
+  starLabels.push(e.date.slice(5));
+  starCum.push(cum);
+});
+// Forecast 14 days from 34
+const starForecastLabels = ['10-08','10-15'];
+const starForecastVals   = [36, 38];
+const starForecastFull   = [...Array(starLabels.length).fill(null), ...starForecastVals];
+const allStarLabels      = [...starLabels, ...starForecastLabels];
+const starCumFull        = [...starCum, ...Array(starForecastLabels.length).fill(null)];
+
+// Weekly commit data
+const weeks = [
+  '04-25','05-02','05-09','05-16','05-23','05-30','06-06','06-13','06-20',
+  '06-27','07-04','07-11','07-18','07-25','08-01','08-08','08-15','08-22',
+  '08-29','09-05','09-12','09-19','09-26'
+];
+const adds = [3709,1523,815,308,73,0,1659,511,1,948,100,2794,19,0,0,0,770,586,0,34,125,2089,0];
+const dels = [838,91,437,267,1,0,1048,417,0,162,42,932,12,0,0,0,614,185,0,54,82,160,0];
+
+// ── DEFAULTS ──────────────────────────────────────────────────────────────────
+const gridColor = 'rgba(48,54,61,0.8)';
+const tickColor = '#8b949e';
+
+// ── CHART 1: Traffic ──────────────────────────────────────────────────────────
+new C(document.getElementById('trafficChart'), {
+  type: 'bar',
+  data: {
+    labels: allTrafficLabels,
+    datasets: [
+      { label:'Views', data: viewsFull, backgroundColor:'rgba(88,166,255,0.55)', borderColor:'#58a6ff', borderWidth:1, borderRadius:3, order:2 },
+      { label:'Clones', data: clonesFull, backgroundColor:'rgba(63,185,80,0.55)', borderColor:'#3fb950', borderWidth:1, borderRadius:3, order:2 },
+      { label:'Forecast Views', data: fViewsFull, type:'line', borderColor:'#58a6ff', borderDash:[5,4], borderWidth:2, pointRadius:3, fill:false, tension:.3, order:1 },
+      { label:'Forecast Clones', data: fClonesFull, type:'line', borderColor:'#3fb950', borderDash:[5,4], borderWidth:2, pointRadius:3, fill:false, tension:.3, order:1 },
+    ]
+  },
+  options: {
+    responsive:true, maintainAspectRatio:false,
+    plugins:{ legend:{ labels:{ color:tickColor, font, boxWidth:12 } } },
+    scales:{
+      x:{ ticks:{ color:tickColor, font, maxRotation:45 }, grid:{ color:gridColor } },
+      y:{ ticks:{ color:tickColor, font }, grid:{ color:gridColor }, beginAtZero:true }
+    }
+  }
+});
+
+// ── CHART 2: Stars cumulative ─────────────────────────────────────────────────
+new C(document.getElementById('starsChart'), {
+  type: 'line',
+  data: {
+    labels: allStarLabels,
+    datasets: [
+      { label:'Cumulative Stars', data: starCumFull, borderColor:'#d29922', backgroundColor:'rgba(210,153,34,0.12)', fill:true, tension:.35, pointRadius:4, pointBackgroundColor:'#d29922' },
+      { label:'Forecast', data: starForecastFull, borderColor:'#d29922', borderDash:[5,4], borderWidth:2, pointRadius:4, fill:false, tension:.3, pointBackgroundColor:'#d29922' },
+    ]
+  },
+  options: {
+    responsive:true, maintainAspectRatio:false,
+    plugins:{ legend:{ labels:{ color:tickColor, font, boxWidth:12 } } },
+    scales:{
+      x:{ ticks:{ color:tickColor, font, maxRotation:45 }, grid:{ color:gridColor } },
+      y:{ ticks:{ color:tickColor, font }, grid:{ color:gridColor }, beginAtZero:true }
+    }
+  }
+});
+
+// ── CHART 3: Uniques vs Views + Event dots ───────────────────────────────────
+// Map event dates to trafficDates index (Sep 10 = index 0)
+const eventAnnotations = [
+  { idx: 5,  label: 'v1.0.0-beta.18', color: '#58a6ff' },  // Sep 15
+  { idx: 12, label: 'dev.to + Reddit', color: '#bc8cff' }, // Sep 22
+  { idx: 15, label: 'v1.0.0 stable',   color: '#3fb950' }, // Sep 25
+  { idx: 18, label: 'r/RAG post',      color: '#ffa657' }, // Sep 28
+  { idx: 20, label: 'Show HN',         color: '#f85149' }, // Sep 30
+];
+
+// Build sparse event dot datasets (one point each so we can colour individually)
+const eventDatasets = eventAnnotations.map(ev => {
+  const d = Array(trafficDates.length).fill(null);
+  d[ev.idx] = views[ev.idx]; // pin dot to views line height
+  return {
+    label: ev.label,
+    data: d,
+    type: 'scatter',
+    pointRadius: 9,
+    pointHoverRadius: 11,
+    pointStyle: 'circle',
+    backgroundColor: ev.color,
+    borderColor: '#0d1117',
+    borderWidth: 2,
+    order: 0,
+  };
+});
+
+new C(document.getElementById('uniquesChart'), {
+  type: 'line',
+  data: {
+    labels: trafficDates,
+    datasets: [
+      { label:'Total Views', data: views, borderColor:'#58a6ff', backgroundColor:'rgba(88,166,255,0.08)', fill:true, tension:.3, pointRadius:2, order:2 },
+      { label:'Unique Visitors', data: uniqueVis, borderColor:'#bc8cff', backgroundColor:'rgba(188,140,255,0.08)', fill:true, tension:.3, pointRadius:2, order:2 },
+      ...eventDatasets,
+    ]
+  },
+  options: {
+    responsive:true, maintainAspectRatio:false,
+    plugins:{
+      legend:{ labels:{ color:tickColor, font, boxWidth:10,
+        filter: item => item.datasetIndex < 2 // only show Views + Uniques in legend
+      }},
+      tooltip:{
+        callbacks:{
+          title: ctx => trafficDates[ctx[0].dataIndex],
+          label: ctx => {
+            if (ctx.datasetIndex >= 2) return ` 📍 ${ctx.dataset.label}`;
+            return ` ${ctx.dataset.label}: ${ctx.raw}`;
+          }
+        }
+      }
+    },
+    scales:{
+      x:{ ticks:{ color:tickColor, font, maxRotation:45 }, grid:{ color:gridColor } },
+      y:{ ticks:{ color:tickColor, font }, grid:{ color:gridColor }, beginAtZero:true }
+    }
+  }
+});
+
+// ── CHART 4: Weekly code ──────────────────────────────────────────────────────
+new C(document.getElementById('commitChart'), {
+  type: 'bar',
+  data: {
+    labels: weeks,
+    datasets: [
+      { label:'Additions', data: adds, backgroundColor:'rgba(63,185,80,0.6)', borderColor:'#3fb950', borderWidth:1, borderRadius:2 },
+      { label:'Deletions', data: dels.map(d=>-d), backgroundColor:'rgba(248,81,73,0.5)', borderColor:'#f85149', borderWidth:1, borderRadius:2 },
+    ]
+  },
+  options: {
+    responsive:true, maintainAspectRatio:false,
+    plugins:{ legend:{ labels:{ color:tickColor, font, boxWidth:12 } } },
+    scales:{
+      x:{ stacked:true, ticks:{ color:tickColor, font, maxRotation:45 }, grid:{ color:gridColor } },
+      y:{ stacked:true, ticks:{ color:tickColor, font }, grid:{ color:gridColor } }
+    }
+  }
+});
+</script>
+</body>
+</html>
