@@ -8,9 +8,9 @@
 ![MCP](https://img.shields.io/badge/MCP-server-8A2BE2?style=flat-square)
 ![License](https://img.shields.io/badge/license-MIT-green?style=flat-square)
 
-> Local-first GitHub traffic tracker with external event correlation, upstream staleness detection, and MCP server access.
-
-GitHub's traffic API returns HTTP 200 with a frozen snapshot and no status page entry. `GitHub-Traffic-Analytics` fixes the silent failure problem; it persists your traffic data locally, detects stale API responses before they corrupt your history, and lets you annotate traffic spikes with the external events that caused them.
+<p align="center">
+GitHub's traffic API returns HTTP 200 with a frozen snapshot and no status page entry. <b>GitHub-Traffic-Analytics</b> fixes the silent failure problem; it persists your traffic data locally, detects stale API responses before they corrupt your history, and lets you annotate traffic spikes with the external events that caused them.
+</p>
 
 ---
 
