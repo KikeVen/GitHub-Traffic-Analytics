@@ -1,4 +1,4 @@
-# Repo Traffic Tracker
+# GitHub Traffic Analytics & Historical Data Tracker
 
 ![web dashboard](img/deep_analysis.png)
 
@@ -8,17 +8,17 @@
 ![MCP](https://img.shields.io/badge/MCP-server-8A2BE2?style=flat-square)
 ![License](https://img.shields.io/badge/license-MIT-green?style=flat-square)
 
-<p align="center">
-GitHub's traffic API returns HTTP 200 with a frozen snapshot and no status page entry. <b>GitHub-Traffic-Analytics</b> fixes the silent failure problem; it persists your traffic data locally, detects stale API responses before they corrupt your history, and lets you annotate traffic spikes with the external events that caused them.
-</p>
+**GitHub-Traffic-Analytics** is a local-first Python automation tool, FastAPI web dashboard, and Model Context Protocol (MCP) server engineered to bypass GitHub's strict 14-day history limit. It automatically backs up and analyzes your repository's traffic metrics into a local SQLite database.
+
+Visit the official [GitHub Traffic Analytics Repository](https://github.com/KikeVen/GitHub-Traffic-Analytics) for full documentation and code.
 
 ---
 
 ## Table of Contents
 
-* [Repo Traffic Tracker](#repo-traffic-tracker)
+* [GitHub Traffic Analytics \& Historical Data Tracker](#github-traffic-analytics--historical-data-tracker)
   * [Table of Contents](#table-of-contents)
-  * [About](#about)
+  * [🚀 Key Features](#-key-features)
   * [Architecture](#architecture)
   * [Features](#features)
   * [Prerequisites](#prerequisites)
@@ -29,9 +29,11 @@ GitHub's traffic API returns HTTP 200 with a frozen snapshot and no status page 
 
 ---
 
-## About
+## 🚀 Key Features
 
-GitHub's built-in traffic graphs are ephemeral; 14-day rolling window, no history, no context. When a Reddit post or a release drives a clone spike, you have no way to know why it happened or compare it to the last time.
+* **Bypass the 14-Day Limit:** Permanently save historical repository metrics via automated data ingestion.
+* **Web UI & Visualization:** Filter and analyze traffic trends with an interactive dashboard and external event logging.
+* **Built-in MCP Server:** Allow AI agents to query your analytics database directly.
 
 `GitHub-Traffic-Analytics` gives you:
 
@@ -59,6 +61,10 @@ SQLite (app.db)
     │
     └──► MCP Server (mcp_server.py) ──► IDE agents (Cursor, VS Code)
 ```
+
+* **ingester.py:** Coordinates GitHub API requests and manages database persistence.
+* **main.py & templates/:** Powers the local FastAPI server and web dashboard.
+* **mcp_server.py:** Exposes structured analytic tools to connected LLMs.
 
 **Key files:**
 
@@ -173,15 +179,29 @@ source .venv/bin/activate      # Windows: .venv\Scripts\activate
 # 3. Install dependencies
 pip install -r requirements.txt
 
-# 4. Initialize the database and run the first sync
+# 4. Configure your default repository
+cp .env.example .env            # Windows: copy .env.example .env
+# Edit .env and set GITHUB_REPO=owner/repo
+
+# 5. Initialize the database and run the first sync
 python ingester.py
 
-# 5. Start the web server
+# 6. Start the web server
 # uvicorn main:app --reload
 python main.py
 ```
 
 Open `http://localhost:8000` in your browser.
+
+**Configuration (`.env`):**
+
+Copy `.env.example` to `.env` and set your default repository:
+
+```dotenv
+GITHUB_REPO=owner/repo
+```
+
+`GITHUB_REPO` is only the default used when running `python ingester.py` directly. The web UI and the MCP `trigger_ingester(repo="owner/repo")` tool pass their own repo and override it, so you can track multiple repositories without editing `.env`. `.env` is gitignored — commit `.env.example` instead.
 
 **MCP server (for IDE agents):**
 

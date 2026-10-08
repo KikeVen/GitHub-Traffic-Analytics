@@ -1,8 +1,10 @@
+import asyncio
+import json
 import os
 import sqlite3
-import json
-import asyncio
+
 from mcp.server.mcpserver import MCPServer
+
 from ingester import sync_repository
 
 # Resolve absolute path based on this file's location
@@ -97,7 +99,7 @@ def log_external_event(repo: str, date: str, title: str, category: str, descript
         conn.close()
         return f"Success: Event '{title}' [{category}] logged for {repo} on {date}."
     except Exception as e:
-        return f"Error logging event: {str(e)}"
+        return f"Error logging event: {e!s}"
 
 
 @mcp.tool()
@@ -147,7 +149,7 @@ def update_external_event(event_id: int, date: str = None, title: str = None, ca
         conn.close()
         return f"Success: Event ID {event_id} updated successfully."
     except Exception as e:
-        return f"Error updating event: {str(e)}"
+        return f"Error updating event: {e!s}"
 
 
 @mcp.tool()
@@ -170,7 +172,7 @@ def delete_external_event(event_id: int) -> str:
         conn.close()
         return f"Success: Event ID {event_id} deleted successfully."
     except Exception as e:
-        return f"Error deleting event: {str(e)}"
+        return f"Error deleting event: {e!s}"
 
 
 @mcp.tool()
@@ -181,7 +183,7 @@ async def trigger_ingester(repo: str) -> str:
         await asyncio.to_thread(sync_repository, repo)
         return f"Success: Ingested latest metrics and traffic data for repository '{repo}'."
     except Exception as e:
-        return f"Error triggering ingester: {str(e)}"
+        return f"Error triggering ingester: {e!s}"
 
 
 @mcp.tool()
@@ -197,7 +199,7 @@ def query_sql(query: str) -> str:
         rows = [dict(row) for row in cursor.fetchall()]
         return json.dumps(rows, indent=2)
     except Exception as e:
-        return f"SQL Error: {str(e)}"
+        return f"SQL Error: {e!s}"
     finally:
         conn.close()
 

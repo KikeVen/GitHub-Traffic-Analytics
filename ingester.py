@@ -1,7 +1,14 @@
 import json
+import os
 import subprocess
 from datetime import datetime
+from pathlib import Path
+
+from dotenv import load_dotenv
+
 from database import get_connection, init_db
+
+load_dotenv(Path(__file__).with_name(".env"))
 
 
 def fetch_github_api(endpoint, extra_headers=None, paginate=False):
@@ -45,7 +52,7 @@ def is_snapshot_stale(cursor, repo_id: int, source_type: str, incoming_items: li
 
     # Get the date of the most recent snapshot for this repository and type
     cursor.execute("""
-        SELECT MAX(logged_date) FROM traffic_sources 
+        SELECT MAX(logged_date) FROM traffic_sources
         WHERE repo_id = ? AND source_type = ?
     """, (repo_id, source_type))
     latest_date_row = cursor.fetchone()
@@ -56,8 +63,8 @@ def is_snapshot_stale(cursor, repo_id: int, source_type: str, incoming_items: li
 
     # Fetch items from that latest snapshot
     cursor.execute("""
-        SELECT source_or_path, count, uniques 
-        FROM traffic_sources 
+        SELECT source_or_path, count, uniques
+        FROM traffic_sources
         WHERE repo_id = ? AND source_type = ? AND logged_date = ?
         ORDER BY source_or_path
     """, (repo_id, source_type, latest_date))
@@ -72,7 +79,7 @@ def is_snapshot_stale(cursor, repo_id: int, source_type: str, incoming_items: li
     # Standardize incoming items based on source_type
     key_name = 'referrer' if source_type == 'referrer' else 'path'
     incoming_snapshot = sorted([
-        (item.get(key_name), item.get('count'), item.get('uniques')) 
+        (item.get(key_name), item.get('count'), item.get('uniques'))
         for item in incoming_items
     ])
 
@@ -185,4 +192,10 @@ def sync_repository(owner_repo):
 
 
 if __name__ == "__main__":
-    sync_repository("kikeven/zerikai_memory")
+    repo = os.getenv("GITHUB_REPO", "").strip()
+    if not repo:
+        raise SystemExit(
+            "GITHUB_REPO is not set. Copy .env.example to .env and set it in the "
+            'format "owner/repo", or pass a repo via the web UI or MCP.'
+        )
+    sync_repository(repo)

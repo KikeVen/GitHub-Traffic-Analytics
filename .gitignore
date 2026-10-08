@@ -8,3 +8,4 @@ analysis_skills/
 # files
 app.db
 .memignore
+.env

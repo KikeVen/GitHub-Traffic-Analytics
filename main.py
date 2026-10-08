@@ -1,9 +1,10 @@
-from fastapi import FastAPI, HTTPException, Request, Query, BackgroundTasks
+import sqlite3
+
+from fastapi import BackgroundTasks, FastAPI, HTTPException, Query, Request
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
-from typing import Optional
-import sqlite3
+
 from database import get_connection
 from ingester import sync_repository
 
@@ -17,9 +18,9 @@ class EventCreate(BaseModel):
     repo_id: int
     event_date: str
     title: str
-    description: Optional[str] = None
-    url: Optional[str] = None
-    category: Optional[str] = "general"
+    description: str | None = None
+    url: str | None = None
+    category: str | None = "general"
 
 class SyncRequest(BaseModel):
     repo: str
@@ -38,7 +39,7 @@ async def sync_repo_data(payload: SyncRequest, background_tasks: BackgroundTasks
     """Triggers the ingester in a background task so the browser doesn't time out."""
     if not payload.repo:
         return {"status": "error", "message": "Repository name is required."}
-    
+
     # Run sync in background thread
     background_tasks.add_task(sync_repository, payload.repo)
     return {"status": "success", "message": f"Sync started in background for '{payload.repo}'."}
@@ -59,33 +60,33 @@ def add_repository(payload: RepoCreate):
 
 @app.get("/api/metrics/{repo_id}")
 def get_repo_metrics(
-    repo_id: int, 
-    start_date: Optional[str] = Query(None), 
-    end_date: Optional[str] = Query(None)
+    repo_id: int,
+    start_date: str | None = Query(None),
+    end_date: str | None = Query(None)
 ):
     conn = get_connection()
     cursor = conn.cursor()
-    
+
     # 1. Daily time-series traffic
     query = "SELECT date, views_count, views_uniques, clones_count, clones_uniques FROM daily_traffic WHERE repo_id = ?"
     params = [repo_id]
-    
+
     if start_date:
         query += " AND date >= ?"
         params.append(start_date)
     if end_date:
         query += " AND date <= ?"
         params.append(end_date)
-        
+
     query += " ORDER BY date ASC"
-    
+
     cursor.execute(query, tuple(params))
     traffic = [dict(row) for row in cursor.fetchall()]
 
     # Summary Totals for selected date range
     summary_query = """
-        SELECT 
-            COALESCE(SUM(views_count), 0) as total_views, 
+        SELECT
+            COALESCE(SUM(views_count), 0) as total_views,
             COALESCE(SUM(views_uniques), 0) as unique_views,
             COALESCE(SUM(clones_count), 0) as total_clones,
             COALESCE(SUM(clones_uniques), 0) as unique_clones
@@ -153,7 +154,7 @@ def get_repo_metrics(
     events = [dict(row) for row in cursor.fetchall()]
 
     conn.close()
-    
+
     return {
         "summary": summary,
         "traffic": traffic,
@@ -188,10 +189,10 @@ def read_source_detail(request: Request, repo_id: int, type: str, name: str):
     cursor.execute("SELECT owner_repo FROM repositories WHERE id = ?", (repo_id,))
     repo = cursor.fetchone()
     conn.close()
-    
+
     if not repo:
         raise HTTPException(status_code=404, detail="Repository not found")
-        
+
     return templates.TemplateResponse(request=request, name="source_detail.html", context={
         "repo_id": repo_id,
         "repo_name": repo["owner_repo"],
@@ -204,12 +205,12 @@ def get_source_history(repo_id: int, type: str, name: str):
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute("""
-        SELECT logged_date, count as views, uniques 
-        FROM traffic_sources 
+        SELECT logged_date, count as views, uniques
+        FROM traffic_sources
         WHERE repo_id = ? AND source_type = ? AND source_or_path = ?
         ORDER BY logged_date ASC
     """, (repo_id, type, name))
-    
+
     history = [dict(row) for row in cursor.fetchall()]
     conn.close()
     return history
