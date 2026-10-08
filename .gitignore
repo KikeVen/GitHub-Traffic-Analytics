@@ -3,6 +3,7 @@ venv/
 __pycache__
 docs/
 working_backup/
+analysis_skills/
 
 # files
 app.db

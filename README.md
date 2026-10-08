@@ -114,6 +114,18 @@ SQLite (app.db)
 ![MCP server](img/Claude_DT_01.png)
 _Claude Desktop: GitHub repository traffic analysis with the MCP server connected._
 
+**Analytics skill (`gh-analytics-skill/SKILL.md`):**
+
+An agent skill that turns the raw MCP tools into a guided analysis workflow. When exposed to an MCP-connected agent, it:
+
+* Always calls `trigger_ingester` first, so answers come from fresh data — never cached
+* Separates organic clones from CI/bot loops (`clone_ratio ≥ 8.0`)
+* Maps deep-funnel path conversion (issues, PRs, discussions, dependency pages) and normalized referrer buckets (Reddit, Hacker News, Google, GitHub)
+* Correlates traffic and star spikes with logged external events, validating unknowns via Tavily
+* Synthesizes KPIs, anomalies, star velocity, and code churn — optionally as a D3.js HTML dashboard
+
+**How to use it:** register the `github-analytics` MCP server in your client, then make the skill file available to your agent (e.g., drop it into your skills directory). The skill triggers automatically on requests like "how's my repo traffic this month?" or "why did stars spike last week?". See `gh-analytics-skill/SKILL.md` for the full query templates, schema reference, and rules.
+
 ---
 
 ## Prerequisites
