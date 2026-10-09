@@ -1,5 +1,3 @@
-import sqlite3
-
 from fastapi import BackgroundTasks, FastAPI, HTTPException, Query, Request
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
@@ -7,6 +5,7 @@ from pydantic import BaseModel
 
 from database import get_connection
 from ingester import sync_repository
+import repo_resolver as rr
 
 app = FastAPI(title="GitHub Analytics Dashboard")
 templates = Jinja2Templates(directory="templates")
@@ -29,8 +28,7 @@ class SyncRequest(BaseModel):
 def read_dashboard(request: Request):
     conn = get_connection()
     cursor = conn.cursor()
-    cursor.execute("SELECT id, owner_repo FROM repositories WHERE is_active = 1")
-    repos = [dict(row) for row in cursor.fetchall()]
+    repos = [r for r in rr.list_repositories(cursor) if r["is_active"] == 1]
     conn.close()
     return templates.TemplateResponse(request=request, name="index.html", context={"repos": repos})
 
@@ -49,14 +47,14 @@ def add_repository(payload: RepoCreate):
     conn = get_connection()
     cursor = conn.cursor()
     try:
-        cursor.execute("INSERT INTO repositories (owner_repo, is_active) VALUES (?, 1)", (payload.owner_repo,))
+        row = rr.ensure_repo(cursor, payload.owner_repo)
+        cursor.execute("UPDATE repositories SET is_active = 1 WHERE id = ?", (row["id"],))
         conn.commit()
-        repo_id = cursor.lastrowid
-    except sqlite3.IntegrityError:
+    except rr.RepoResolutionError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    finally:
         conn.close()
-        raise HTTPException(status_code=400, detail="Repository already exists")
-    conn.close()
-    return {"status": "success", "id": repo_id, "owner_repo": payload.owner_repo}
+    return {"status": "success", "id": row["id"], "owner_repo": row["owner_repo"]}
 
 @app.get("/api/metrics/{repo_id}")
 def get_repo_metrics(
@@ -168,17 +166,31 @@ def get_repo_metrics(
 @app.post("/api/events")
 def create_event(event: EventCreate):
     conn = get_connection()
-    cursor = conn.cursor()
-    cursor.execute(
-        """
-        INSERT INTO external_events (repo_id, event_date, title, description, url, category)
-        VALUES (?, ?, ?, ?, ?, ?)
-        """,
-        (event.repo_id, event.event_date, event.title, event.description, event.url, event.category)
-    )
-    conn.commit()
-    conn.close()
-    return {"status": "success"}
+    try:
+        cursor = conn.cursor()
+        try:
+            date = rr.validate_date(event.event_date)
+            title = rr.validate_text(event.title, "title", max_len=rr.MAX_TITLE_LEN)
+            description = rr.validate_text(
+                event.description, "description", required=False,
+                max_len=rr.MAX_DESCRIPTION_LEN)
+            url = rr.validate_url(event.url, required=False)
+            category = rr.validate_category(event.category or "general")
+            target = rr.resolve_repo(cursor, repo_id=event.repo_id)
+        except (rr.InputValidationError, rr.RepoResolutionError) as exc:
+            raise HTTPException(status_code=400, detail=str(exc))
+
+        new_id = cursor.execute(
+            """
+            INSERT INTO external_events (repo_id, event_date, title, description, url, category)
+            VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            (target["id"], date, title, description, url, category),
+        ).lastrowid
+        conn.commit()
+        return {"status": "success", "id": new_id}
+    finally:
+        conn.close()
 
 # --- ROUTES FOR DETAILED SOURCE CHARTS ---
 

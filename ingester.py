@@ -7,6 +7,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 from database import get_connection, init_db
+from repo_resolver import ensure_repo
 
 load_dotenv(Path(__file__).with_name(".env"))
 
@@ -93,11 +94,10 @@ def sync_repository(owner_repo):
     conn = get_connection()
     cursor = conn.cursor()
 
-    cursor.execute(
-        "INSERT OR IGNORE INTO repositories (owner_repo) VALUES (?)", (owner_repo,))
-    cursor.execute(
-        "SELECT id FROM repositories WHERE owner_repo = ?", (owner_repo,))
-    repo_id = cursor.fetchone()["id"]
+    # Reuse any existing case-variant row instead of creating a duplicate.
+    repo_row = ensure_repo(cursor, owner_repo)
+    repo_id = repo_row["id"]
+    owner_repo = repo_row["owner_repo"]
 
     today = datetime.now().strftime("%Y-%m-%d")
 
