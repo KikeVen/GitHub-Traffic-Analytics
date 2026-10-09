@@ -13,7 +13,18 @@ load_dotenv(Path(__file__).with_name(".env"))
 
 
 def fetch_github_api(endpoint, extra_headers=None, paginate=False):
-    """Executes gh CLI and parses JSON output safely with UTF-8 encoding."""
+    """Wraps GitHub CLI (gh api) via subprocess. Builds command, captures output, parses JSON.
+    Branches on paginate flag: concatenates multi-page responses by replacing ][ with comma.
+    Uses UTF-8 encoding with error=replace to handle encoding mismatches. Prints error to stdout
+    on subprocess or JSON decode failure. Returns None if stdout is empty or exception occurs.
+    Guarantees: idempotent (no side effects on GitHub). No connection pooling or retry logic.
+    Args:
+        endpoint: GitHub API path (e.g., 'repos/owner/repo/traffic/views').
+        extra_headers: Optional list of -H values to pass to gh api.
+        paginate: If True, appends --paginate and merges concatenated JSON arrays.
+    Returns:
+        dict or list: Parsed JSON, or None if response was empty or error occurred.
+    """
     cmd = ["gh", "api", endpoint]
     if paginate:
         cmd.append("--paginate")
@@ -44,9 +55,17 @@ def fetch_github_api(endpoint, extra_headers=None, paginate=False):
 
 
 def is_snapshot_stale(cursor, repo_id: int, source_type: str, incoming_items: list) -> bool:
-    """
-    Checks if incoming API snapshot data is 100% identical to the latest logged snapshot.
-    Returns True if the incoming data is frozen/stale, False otherwise.
+    """Detects frozen GitHub API responses by comparing incoming traffic snapshot to latest SQLite row.
+    Branches: (1) empty incoming_items → returns False (new data); (2) no historical row → returns False;
+    (3) exact match on all items, counts, uniques → returns True (stale cache). Uses sqlite3 cursor,
+    queries traffic_sources table, performs sorted tuple comparison. Idempotent read-only.
+    Args:
+        cursor: sqlite3 cursor with row_factory=sqlite3.Row.
+        repo_id: Repository ID in traffic_sources.
+        source_type: 'referrer' or 'path'.
+        incoming_items: List of dicts from GitHub API (keys: referrer|path, count, uniques).
+    Returns:
+        bool: True if incoming snapshot is 100% identical to latest logged row (stale).
     """
     if not incoming_items:
         return False
@@ -89,7 +108,19 @@ def is_snapshot_stale(cursor, repo_id: int, source_type: str, incoming_items: li
 
 
 def sync_repository(owner_repo):
-    """Fetches ALL repository metrics and stores them in SQLite."""
+    """Fetches all GitHub repository traffic metrics via GitHub CLI and upserts into SQLite.
+    Branches: (1) daily_traffic (views/clones time-series); (2) traffic_sources (referrers snapshot);
+    (3) traffic_sources (paths snapshot). For each branch, calls fetch_github_api, checks staleness
+    via is_snapshot_stale, and conditionally inserts or skips via INSERT ON CONFLICT. Only writes
+    daily_traffic rows where BOTH views and clones data exist (intersection) to prevent false zeros.
+    Uses repo_resolver.ensure_repo to reuse canonical case-variant row. Prints staleness warnings
+    to stdout. Mutates database via upsert operations. Idempotent: ON CONFLICT DO UPDATE ensures
+    re-runs overwrite prior snapshots without duplication errors.
+    Args:
+        owner_repo: Repository name in 'owner/repo' format (canonical after ensure_repo).
+    Returns:
+        None (side effect: mutates SQLite database).
+    """
     init_db()
     conn = get_connection()
     cursor = conn.cursor()
@@ -110,9 +141,11 @@ def sync_repository(owner_repo):
     clones_by_date = {c["timestamp"][:10]
         : c for c in clones_data.get("clones", [])}
 
-    for dt in set(views_by_date.keys()).union(set(clones_by_date.keys())):
-        v = views_by_date.get(dt, {"count": 0, "uniques": 0})
-        c = clones_by_date.get(dt, {"count": 0, "uniques": 0})
+    # Only write rows for dates where GitHub returned data for BOTH views and clones.
+    # Using intersection prevents false zeros when GitHub's API partially freezes.
+    for dt in set(views_by_date.keys()).intersection(set(clones_by_date.keys())):
+        v = views_by_date[dt]
+        c = clones_by_date[dt]
         cursor.execute("""
             INSERT INTO daily_traffic (repo_id, date, views_count, views_uniques, clones_count, clones_uniques)
             VALUES (?, ?, ?, ?, ?, ?)

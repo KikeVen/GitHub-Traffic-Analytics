@@ -16,21 +16,34 @@ import sqlite3
 from mcp.server.mcpserver import MCPServer
 from mcp.server.mcpserver.exceptions import ToolError
 
-from ingester import sync_repository
 import repo_resolver as rr
+from ingester import sync_repository
 
-# Resolve absolute path based on this file's location
+# Absolute directory path of the module root. Initialized via os.path.dirname(abspath(__file__)).
+# Scopes database paths to this directory. Used by DB_PATH and all table operations.
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+# Path to SQLite database file (app.db) within BASE_DIR. Initialized via os.path.join.
+# Used by get_connection() to open or create the database file.
 DB_PATH = os.path.join(BASE_DIR, "app.db")
 
 
 def get_connection():
+    """Opens a new SQLite connection to DB_PATH with row factory set to sqlite3.Row.
+    Enables dict-like access to rows via column names. No connection pooling or caching.
+    Returns:
+        sqlite3.Connection: Active connection with row_factory=sqlite3.Row.
+    """
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     return conn
 
 
 def _json(**payload):
+    """Serialize a Python dict to indented JSON with ensure_ascii=False.
+    Used by all tool return values and error responses to construct machine-readable JSON.
+    Returns:
+        str: Indented JSON representation of payload with 2-space indentation.
+    """
     return json.dumps(payload, indent=2, ensure_ascii=False)
 
 
@@ -40,6 +53,12 @@ def _fail(message: str, **extra):
 
 
 def _events_table(cursor) -> str:
+    """Detects which events table exists in the database schema.
+    Returns 'external_events' if it exists, otherwise 'events' (legacy fallback).
+    Queries sqlite_master to check table presence without requiring schema migration.
+    Returns:
+        str: 'external_events' or 'events' depending on what exists in schema.
+    """
     cursor.execute(
         "SELECT name FROM sqlite_master WHERE type='table' AND name='external_events'")
     return "external_events" if cursor.fetchone() else "events"

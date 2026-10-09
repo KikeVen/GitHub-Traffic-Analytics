@@ -3,17 +3,24 @@ from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 
+import repo_resolver as rr
 from database import get_connection
 from ingester import sync_repository
-import repo_resolver as rr
 
 app = FastAPI(title="GitHub Analytics Dashboard")
 templates = Jinja2Templates(directory="templates")
 
 class RepoCreate(BaseModel):
+    """Request body for adding a new repository to tracking. Validated by FastAPI Pydantic.
+    Resolves canonical owner/repo name to ensure case-consistent duplicates are reused.
+    """
     owner_repo: str
 
 class EventCreate(BaseModel):
+    """Request body for logging external events (articles, Hacker News, launches).
+    Validated by FastAPI Pydantic and repo_resolver validation functions before insert.
+    Requires: repo_id, event_date, title. Optional: description, url, category.
+    """
     repo_id: int
     event_date: str
     title: str
@@ -22,10 +29,16 @@ class EventCreate(BaseModel):
     category: str | None = "general"
 
 class SyncRequest(BaseModel):
+    """Request body for triggering repository sync. Contains canonical owner/repo name.
+    Validated by FastAPI Pydantic before passing to sync_repository in background task.
+    """
     repo: str
 
 @app.get("/", response_class=HTMLResponse)
 def read_dashboard(request: Request):
+    """Handles GET / via FastAPI route. Renders main dashboard with all active repositories.
+    Queries database for repos with is_active=1. Returns Jinja2 template index.html.
+    """
     conn = get_connection()
     cursor = conn.cursor()
     repos = [r for r in rr.list_repositories(cursor) if r["is_active"] == 1]
@@ -34,7 +47,10 @@ def read_dashboard(request: Request):
 
 @app.post("/api/sync")
 async def sync_repo_data(payload: SyncRequest, background_tasks: BackgroundTasks):
-    """Triggers the ingester in a background task so the browser doesn't time out."""
+    """Handles POST /api/sync via FastAPI route. Accepts SyncRequest with owner/repo name.
+    Spawns ingester.sync_repository as background task to avoid browser timeout.
+    Validates repo name is not empty. Returns status message. Side effect: mutates database.
+    """
     if not payload.repo:
         return {"status": "error", "message": "Repository name is required."}
 
@@ -44,6 +60,10 @@ async def sync_repo_data(payload: SyncRequest, background_tasks: BackgroundTasks
 
 @app.post("/api/repos")
 def add_repository(payload: RepoCreate):
+    """Handles POST /api/repos via FastAPI route. Accepts RepoCreate body (owner_repo).
+    Calls repo_resolver.ensure_repo to resolve or create canonical row. Sets is_active=1.
+    Returns new repo_id and canonical owner_repo. Raises HTTPException 400 on resolution error.
+    """
     conn = get_connection()
     cursor = conn.cursor()
     try:
@@ -62,6 +82,10 @@ def get_repo_metrics(
     start_date: str | None = Query(None),
     end_date: str | None = Query(None)
 ):
+    """Handles GET /api/metrics/{repo_id} via FastAPI route. Branches on optional date range.
+    Returns: daily_traffic time-series, summary totals (views/clones), referrers snapshot,
+    paths snapshot, external_events within date range. All queries filtered by repo_id.
+    """
     conn = get_connection()
     cursor = conn.cursor()
 
@@ -165,6 +189,10 @@ def get_repo_metrics(
 
 @app.post("/api/events")
 def create_event(event: EventCreate):
+    """Handles POST /api/events via FastAPI route. Accepts EventCreate body with validation.
+    Validates via repo_resolver: date (YYYY-MM-DD), text fields, URL, category, repo_id.
+    Inserts into external_events table. Returns new event id. Raises HTTPException 400 on error.
+    """
     conn = get_connection()
     try:
         cursor = conn.cursor()
@@ -196,6 +224,10 @@ def create_event(event: EventCreate):
 
 @app.get("/source/{repo_id}", response_class=HTMLResponse)
 def read_source_detail(request: Request, repo_id: int, type: str, name: str):
+    """Handles GET /source/{repo_id} via FastAPI route. Path parameters: type (referrer|path), name.
+    Queries repository by repo_id, renders Jinja2 template source_detail.html with context.
+    Raises HTTPException 404 if repository not found.
+    """
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute("SELECT owner_repo FROM repositories WHERE id = ?", (repo_id,))
@@ -214,6 +246,10 @@ def read_source_detail(request: Request, repo_id: int, type: str, name: str):
 
 @app.get("/api/metrics/{repo_id}/source_history")
 def get_source_history(repo_id: int, type: str, name: str):
+    """Handles GET /api/metrics/{repo_id}/source_history via FastAPI route.
+    Returns time-series history of a single referrer or path within traffic_sources table.
+    Filters by repo_id, source_type (referrer|path), and source_or_path name. Sorted by logged_date.
+    """
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute("""

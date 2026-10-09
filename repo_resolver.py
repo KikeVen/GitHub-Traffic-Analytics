@@ -21,12 +21,18 @@ from urllib.parse import urlparse
 from database import get_connection
 
 # --- validation limits -------------------------------------------------------
+# Maximum title length in characters (event titles, descriptions). Enforced by validate_text.
 MAX_TITLE_LEN = 300
+# Maximum category label length in characters. Enforced by validate_category.
 MAX_CATEGORY_LEN = 50
+# Maximum description length in characters. Enforced by validate_text.
 MAX_DESCRIPTION_LEN = 4000
+# Maximum URL length in characters. Enforced by validate_url.
 MAX_URL_LEN = 2000
+# Row result limit for raw SQL queries. Appended to WHERE clause if query has no LIMIT.
 MAX_QUERY_ROWS = 500
 
+# Regex pattern for strict YYYY-MM-DD date format validation. Used by validate_date.
 _DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
 
@@ -39,6 +45,11 @@ class InputValidationError(ValueError):
 
 
 def _norm(value: str | None) -> str:
+    """Trims whitespace from a string. Returns empty string if value is None.
+    Used by all validation functions and repository name resolution before processing.
+    Returns:
+        str: Trimmed string or empty string if input is None.
+    """
     return (value or "").strip()
 
 
@@ -199,7 +210,8 @@ def validate_category(value: str | None) -> str:
 
 
 # --- SQL safety --------------------------------------------------------------
-
+# Regex pattern to detect write operations (INSERT, UPDATE, DELETE, etc.).
+# Matches case-insensitively. Used by validate_read_query to block non-SELECT statements.
 _BANNED_SQL = re.compile(
     r"\b(insert|update|delete|drop|alter|attach|detach|pragma|create|replace|"
     r"vacuum|reindex|truncate|grant|revoke)\b",
@@ -229,18 +241,18 @@ def validate_read_query(query: str) -> str:
 
 
 __all__ = [
-    "RepoResolutionError",
+    "MAX_DESCRIPTION_LEN",
+    "MAX_QUERY_ROWS",
+    "MAX_TITLE_LEN",
     "InputValidationError",
+    "RepoResolutionError",
+    "ensure_repo",
     "get_connection",
     "list_repositories",
     "resolve_repo",
-    "ensure_repo",
+    "validate_category",
     "validate_date",
+    "validate_read_query",
     "validate_text",
     "validate_url",
-    "validate_category",
-    "validate_read_query",
-    "MAX_TITLE_LEN",
-    "MAX_DESCRIPTION_LEN",
-    "MAX_QUERY_ROWS",
 ]

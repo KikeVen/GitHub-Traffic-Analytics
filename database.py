@@ -1,18 +1,33 @@
 import os
 import sqlite3
 
-# Resolve absolute path based on database.py's location on your filesystem
+# Absolute directory path of the module root. Initialized via os.path.dirname(abspath(__file__)).
+# Scopes all relative database paths to this directory. Used by DB_PATH and all table operations.
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+# Path to SQLite database file (app.db) within BASE_DIR. Initialized via os.path.join.
+# Used by get_connection() to open or create the database file.
 DB_PATH = os.path.join(BASE_DIR, "app.db")
 
 
 def get_connection():
+    """Opens a new SQLite connection to DB_PATH with row factory set to sqlite3.Row.
+    Enables dict-like access to rows via column names. Does not initialize tables
+    — call init_db() once at startup. No connection pooling or caching.
+    Returns:
+        sqlite3.Connection: Active connection with row_factory=sqlite3.Row.
+    """
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     return conn
 
 
 def init_db():
+    """Creates all required SQLite tables if they do not exist. Idempotent.
+    Runs on first sync or on manual database reset. Uses CREATE TABLE IF NOT EXISTS
+    to prevent errors on repeated calls. Commits all changes before returning.
+    Tables: repositories, daily_traffic, traffic_sources, stars_history,
+    releases_history, external_events.
+    """
     with get_connection() as conn:
         cursor = conn.cursor()
 
