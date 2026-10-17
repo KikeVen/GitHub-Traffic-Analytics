@@ -135,6 +135,25 @@ def init_db():
         conn.commit()
 
 
+def _auto_init():
+    """Auto-initialize database tables on module import if they don't exist.
+    Runs once when database.py is first imported. Idempotent and safe for repeated imports.
+    """
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='repositories'")
+    if not cursor.fetchone():
+        # Tables don't exist, run init
+        conn.close()
+        init_db()
+    else:
+        conn.close()
+
+
+# Auto-initialize tables on module import
+_auto_init()
+
+
 if __name__ == "__main__":
     init_db()
     print(f"Database initialized successfully at {DB_PATH}")
